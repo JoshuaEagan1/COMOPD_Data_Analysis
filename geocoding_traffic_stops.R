@@ -47,7 +47,7 @@ save("stops", "GC", file="E:/CPD data dashboard/data/geocoding traffic stops/GC.
 load(file="E:/CPD data dashboard/data/geocoding traffic stops/GC.R")
 library(ggmap)
 library(Rcpp)
-register_google(key="AIzaSyCJ2R_1YoJVkGpiFPzUCxIAOB6Th1J6q3I")
+register_google(key="")
 
 Go.to<-GC+2500
 
