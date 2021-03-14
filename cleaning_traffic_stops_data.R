@@ -7,7 +7,7 @@
 library(rvest)
 library(tidyverse)
 
-#reading in stops data
+#reading in the traffic stops data
 
 #URL's and data was loaded from CPD's website https://www.como.gov/police/data-reporting-forms/ on January 19, 2021
 
