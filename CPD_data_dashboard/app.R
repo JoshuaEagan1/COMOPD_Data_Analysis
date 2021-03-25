@@ -1,4 +1,6 @@
-#cleaning the data to make a shiny app of policing data
+#COMOPD Traffic Stops Shiny App
+
+###############################################################################################
 
 #packages
 library(sf)
@@ -8,130 +10,9 @@ library(sp)
 library(rgdal)
 library(leaflet)
 library(RColorBrewer)
-
-#loading stops data
-load("E:/Police_Work_2021/standardized_traffic_stops_data_20210218.R")
-
-#loading census blocks shapefile
-#zip file containing this map layer can be downloaded at:
-#https://www2.census.gov/geo/tiger/TIGER2020PL/STATE/29_MISSOURI/29/tl_2020_29_tract20.zip
-tracts<-readOGR(dsn="E:/Police_Work_2021/CPD_data_dashboard/data/tl_2020_29_tract20", layer="tl_2020_29_tract20")
-tracts<-tracts%>%st_as_sf(crs="+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
-
-#edit later to create a single file to import geocoordinates with incident ID's
-
-###
-
-#importing geocoordinates for traffic stops
-load(file="E:/Honors Thesis/R-files/R Data/last_year_coordinates.R")
-load(file="E:/Honors Thesis/R-files/R Data/first_five_years_coordinates.R")
-rm(df)
-names(last_year_coordinates)[1]<-"Incident_Number"
-points<-rbind(first_five_years_coordinates,last_year_coordinates)
-rm(first_five_years_coordinates)
-rm(last_year_coordinates)
-rm(USmap)
-rm(comomap)
-names(points)[1]<-"inci_id"
-
-###
-
-#merging lat lon to stops data
-stops<-merge(stops, points, all.x=T)
-
-#dropping 1 observation with no lat and lon
-stops<-stops %>% filter(!is.na(lat))
-
-#making the sf dataframe
-pointsSP<-SpatialPointsDataFrame(stops[,59:60], stops[,-(59:60)], proj4string=CRS("+proj=longlat +datum=WGS84"))
-cord.lonlat<- spTransform(pointsSP, CRS("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0"))
-stops<-cord.lonlat%>%st_as_sf(crs="+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
-rm(cord.lonlat)
-rm(points)
-rm(pointsSP)
-
-stops<-st_join(stops, tracts, join = st_within) #%>% select(-c(59:61, 63:70))
-stops<-stops %>% filter(GEOID20 !="29107090601")
-
-
-#caching tracts
-restore_tracts<-tracts
-
-###############################################################################################
-
 library(leaflet)
 library(shiny)
 library(shinydashboard)
-
-
-# header board
-header <- dashboardHeader(
-        title = 'COMOPD Data'
-        # task list for status of data processing
-        , dropdownMenuOutput('task_menu'))
-
-# Side bar boardy
-sidebar <- dashboardSidebar(
-        sidebarMenu(
-                id = 'menu_tabs'
-                , menuItem('menu1', tabName = 'menu1')
-                , menuItem('menu2', tabName = 'menu2')
-                
-        )
-)
-
-# Body board
-body <- dashboardBody(
-        tabItems(
-                
-                tabItem(
-                        tabName = 'menu1'
-                        , tags$a(
-                                id = "mydiv", href = "#", 'click me', 
-                                onclick = 'Shiny.onInputChange("mydata", Math.random());')
-                ),
-                tabItem(
-                        tabName = 'menu2'
-                        , leafletOutput('map')
-                        , verbatimTextOutput('summary')
-                )
-        )
-)
-
-# Shiny UI
-ui <- dashboardPage(
-        title = 'test',
-        header,
-        sidebar,
-        body
-)
-
-server <- function(input, output, session) {
-        observe({
-                req(input$mydata)
-                updateTabItems(session, 'menu_tabs', 'menu2')
-        })
-        output$map <- renderLeaflet({
-                leaflet() %>%  
-                        addTiles(options = tileOptions(maxZoom = 28, maxNativeZoom = 19),
-                                 group = 'OSM')
-        })
-        output$summary <- renderPrint({
-                print(input$mydata)
-                print(leafletProxy('map')$id)
-        })
-        observe({
-                req(input$mydata)
-                proxy <- leafletProxy('map')
-                print(proxy$id)
-                proxy %>% 
-                        setView(runif(1) * 30 +2, runif(1) * 30 + 2, 7)
-        })
-}
-
-
-shinyApp(ui, server)
-
 
 ##############################################################################
 
@@ -152,10 +33,10 @@ header <- dashboardHeader(
 sidebar <- dashboardSidebar(
         sidebarMenu(
                 id = 'menu_tabs'
-                , menuItem("filters", tabName = "filters")
-                , menuItem("hit rates", tabName = "hit_rates")
-                , menuItem("by race", tabName = "by_race")
-                , menuItem('by infraction', tabName = 'by_infraction')
+                , menuItem("Filters", tabName = "filters")
+                , menuItem("Hit Rates", tabName = "hit_rates")
+                , menuItem("Demographics", tabName = "by_race")
+                , menuItem('Download the Raw Data', tabName = 'rawdata')
                 
         )
 )
@@ -182,9 +63,9 @@ body <- dashboardBody(
                         ,checkboxInput("male_internal", "Male")
                         ,checkboxInput("female_internal", "Female")
                         ,checkboxInput("under_18_internal", "Under 18 Years Old")
-                        ,checkboxInput("18-29_internal", "18 to 29 Years Old")
-                        ,checkboxInput("30-39_internal", "30 to 39 Years Old")
-                        ,checkboxInput("40+_internal", "40 Years Old or Older")
+                        ,checkboxInput("under_29_internal", "18 to 29 Years Old")
+                        ,checkboxInput("under_39_internal", "30 to 39 Years Old")
+                        ,checkboxInput("above_40_internal", "40 Years Old or Older")
                         
                         ,tags$h3("Reason for Stop")
                         ,checkboxInput("speed_internal", "Speeding")
@@ -201,26 +82,31 @@ body <- dashboardBody(
                         ,checkboxInput("driver_arrest_internal", "Arrest")
                         
                         ,tags$h3("Apply Filters")
-                        ,actionButton("filter_button", "GO")
-                        , verbatimTextOutput("summary")
-                        , leafletOutput("map")
-
-                )
+                        ,actionButton("filter_button", "GO"))
                 
                 #hit rates tab
-                #,tabItem(
-                #        tabName = 'hit_rates'
-                #        , box(width = 8, title="Hit Rates by Census Tract", leafletOutput("map"))
-                #)
+                ,tabItem(
+                        tabName = 'hit_rates'
+                        ,tags$h3("Hit Rates by Census Tract")
+                        ,leafletOutput("map1"))
+                
+                
+                #stops by race tab
+                ,tabItem(
+                        tabName = 'by_race'
+                        ,tags$h3("Stop Demographics by Census Tract")
+                        ,leafletOutput('map2')
+                )
+                
+                ,tabItem(tabName = "rawdata"
+                         , box(width = 8, title="Download the Raw Data"
+                         , tags$h6("Click the link below to download the traffic stops data used to generate
+                                   these maps. The output file will be a .csv file, openable by excel, as well as
+                                   statistical programs like R and STATA.")
+                        ,downloadLink("COMOPDTrafficStopsData.csv", "Download CSV")))
                 
                 #
                 #,tabItem(
-                #        tabName = 'by_race'
-                #        , leafletOutput('map')
-                #),
-                
-                #
-                #tabItem(
                 #        tabName = 'by_infraction'
                 #        , leafletOutput('map')
                 #)
@@ -229,33 +115,69 @@ body <- dashboardBody(
 
 server <- function(input, output, session) {
         
-        #filtering stops data
-        #filteredstops <- reactive({
-                #input$filter_button
-        #        stops
-        #})
+        #importing the app data
+        load("./data/app_data.R")
         
         observeEvent(input$filter_button, {
+                
+        ### filtering the stops data
+        if(!(input$white_internal|input$black_internal|input$hispanic_internal|input$asian_internal|
+           input$native_american_internal|input$male_internal|input$female_internal|
+           input$under_18_internal|input$under_29_internal|input$under_39_internal|input$above_40_internal|
+           input$speed_internal|input$lane_violation_internal|input$follow_to_close_internal|
+           input$fail_to_signal_internal|input$equipment_internal|input$license_internal|
+           input$search_internal|input$citation_internal|input$warning_internal|
+           input$driver_arrest_internal)){
+                print("yes")
+                filterer<-rep(T, nrow(stops))
+        } else {
+                filterer<-rep(F, nrow(stops)) 
+                if(input$white_internal){filterer[stops$race=="W"]<-T}
+                if(input$black_internal){filterer[stops$race=="B"]<-T}
+                if(input$hispanic_internal){filterer[stops$race=="H"]<-T}
+                if(input$asian_internal){filterer[stops$race=="A"]<-T}
+                if(input$native_american_internal){filterer[stops$race=="I"]<-T}
+                if(input$male_internal){filterer[stops$gender=="M"]<-T}
+                if(input$female_internal){filterer[stops$gender=="F"]<-T}
+                if(input$under_18_internal){filterer[stops$age=="Under 18"]<-T}
+                if(input$under_29_internal){filterer[stops$age=="18--29"]<-T}
+                if(input$under_39_internal){filterer[stops$age=="30--39"]<-T}
+                if(input$above_40_internal){filterer[stops$age=="40+"]<-T}
+                if(input$speed_internal){filterer[stops$speed=="1"]<-T}
+                if(input$lane_violation_internal){filterer[stops$lane_violation=="1"]<-T}
+                if(input$follow_to_close_internal){filterer[stops$follow_to_close=="1"]<-T}
+                if(input$fail_to_signal_internal){filterer[stops$fail_to_signal=="1"]<-T}
+                if(input$equipment_internal){filterer[stops$equipment=="1"]<-T}
+                if(input$license_internal){filterer[stops$license=="1"]<-T}
+                if(input$search_internal){filterer[stops$what_searched!=""]<-T}
+                if(input$citation_internal){filterer[stops$citation=="1"]<-T}
+                if(input$warning_internal){filterer[stops$warning=="1"]<-T}
+                if(input$driver_arrest_internal){filterer[stops$driver_arrest=="YES"]<-T}
+        }
+        
+        filtered_stops<-stops %>% filter(filterer)
+        
+        ###
         
         #aggregate the stops
-        grouped_stops<- stops %>% group_by(GEOID20) %>%
-                summarise(hit_rate=mean(contraband_found=="Yes")/mean(!what_searched==""), number_of_searches=n(),
+        grouped_stops<- filtered_stops %>% group_by(GEOID20) %>%
+                summarise(hit_rate=mean(contraband_found=="Yes")/mean(!what_searched==""), number_of_searches=sum(what_searched!=""),
                           White=mean(race=="W"), Black=mean(race=="B"), 
                           OtherRace=mean(race!="W"&race!="B"), Male=mean(gender=="M"), 
                           Female=mean(gender=="F"), Below_30=mean(age %in% c("18--29", "Under 18")),
                           Above_29=mean(age %in% c("40+", "30--39")),
-                          propNonwhite=mean(race!="W"))
+                          propNonwhite=mean(race!="W"), total=n())
         
         #merging hit rates back in
         tracts<-tracts %>% filter(GEOID20 %in% grouped_stops$GEOID20)
-        grouped_stops<-grouped_stops %>% as.data.frame() %>% select(1:3)
+        grouped_stops<-grouped_stops %>% as.data.frame() %>% select(-13)
         grouped_stops<-merge(tracts, grouped_stops)
         grouped_stops<-st_transform(grouped_stops, "+init=epsg:4326")
         
         
         #making the leaflets
         
-        #making the popup
+        #making the hit rates popup
         hit_rate_popup <- paste0("<strong>Census Tract Identifier: </strong>", 
                               paste0(grouped_stops$GEOID20), 
                               "<br><strong>Percentage of Searches Discovering Contraband: </strong>", 
@@ -264,23 +186,70 @@ server <- function(input, output, session) {
                               paste0(grouped_stops$number_of_searches))
         
         #making the color ramp
-        pal<-colorNumeric(palette = c("red","green"), domain=grouped_stops$hit_rate)
+        pal1<-colorNumeric(palette = c("red","green"), domain=grouped_stops$hit_rate)
         
-        #compiling leaflet
-        output$map<-renderLeaflet({
+        #compiling hit rates leaflet
+        output$map1<-renderLeaflet({
                 l<-leaflet(data = grouped_stops) %>% addTiles() %>%
                         addPolygons(color = "#444444", 
                                     weight=1,
-                                    fillColor = pal(grouped_stops$hit_rate), 
+                                    fillColor = pal1(grouped_stops$hit_rate), 
                                     popup=hit_rate_popup,
                                     highlightOptions = highlightOptions(color = "white", weight = 2,
                                                                         bringToFront = TRUE))
                 l %>% addLegend(position="bottomright", 
-                                pal=pal,
+                                pal=pal1,
                                 values=~hit_rate,
                                 title = paste('Search Hit Rate by Census Tract'))
                 })
+        
+        #race age gender
+        
+        #making the popup
+        RAG_popup <- paste0("<strong>Census Tract Identifier: </strong>", 
+                              paste0(grouped_stops$GEOID20), 
+                              "<br><strong>% White Drivers Stopped: </strong>", 
+                              paste0(round(grouped_stops$White*100, 2), "%"),
+                              "<br><strong>% Black Drivers Stopped: </strong>", 
+                              paste0(round(grouped_stops$Black*100, 2), "%"),
+                              "<br><strong>% Other Race Drivers Stopped: </strong>", 
+                              paste0(round(grouped_stops$OtherRace*100, 2), "%"),
+                              "<br><strong>% Male Drivers Stopped: </strong>", 
+                              paste0(round(grouped_stops$Male*100, 2), "%"),
+                              "<br><strong>% Female Drivers Stopped: </strong>", 
+                              paste0(round(grouped_stops$Female*100, 2), "%"),
+                              "<br><strong>% Drivers Under the Age of 30 Stopped: </strong>", 
+                              paste0(round(grouped_stops$Below_30*100, 2), "%"),
+                              "<br><strong>% Drivers Over the Age of 29 Stopped: </strong>", 
+                              paste0(round(grouped_stops$Above_29*100, 2), "%"),
+                              "<br><strong>Number of Drivers Stopped: </strong>" ,
+                              paste0(grouped_stops$total)
+        )
+        
+        #making the color ramp
+        pal2<-colorNumeric(palette = c("white","black"), domain=grouped_stops$propNonwhite)
+        
+        #compiling hit rates leaflet
+        output$map2<-renderLeaflet({
+                l<-leaflet(data = grouped_stops) %>% addTiles() %>%
+                        addPolygons(color = "#444444", 
+                                    weight=1,
+                                    fillColor = pal2(grouped_stops$propNonwhite), 
+                                    popup=RAG_popup,
+                                    highlightOptions = highlightOptions(color = "white", weight = 2,
+                                                                        bringToFront = TRUE))
+                l %>% addLegend(position="bottomright", 
+                                pal=pal2,
+                                values=~propNonwhite,
+                                title = paste('Proportion Non-White Stopped'))
+        })
+        
         }) #end observe event button
+        
+        output$COMOPDTrafficStopsData.csv <- downloadHandler(
+                filename = "COMOPDTrafficStopsData.csv",
+                content = function(file){write.csv(download, file)}
+        )
         
 }#end server
 
