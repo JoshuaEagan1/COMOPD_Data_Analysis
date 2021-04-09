@@ -33,6 +33,7 @@ header <- dashboardHeader(
 sidebar <- dashboardSidebar(
         sidebarMenu(
                 id = 'menu_tabs'
+                , menuItem("How to Use this Tool", tabName = "How_to_Use_this_Tool")
                 , menuItem("Filters", tabName = "filters")
                 , menuItem("Hit Rates", tabName = "hit_rates")
                 , menuItem("Demographics", tabName = "by_race")
@@ -45,14 +46,45 @@ sidebar <- dashboardSidebar(
 body <- dashboardBody(
         tabItems(
                 
+                #description tab
+                tabItem(tabName = 'How_to_Use_this_Tool'
+                        ,tags$h1("How to Use this Tool")
+                        ,tags$h5("This tool is intended to help you explore the publicly released data on traffic
+                                stops by Columbia Police Department from 2014-2019. Stops are broken down by the
+                                2020 Census tract boundary they occurred within in the `Hit Rates by Census Tract`
+                                and `Demographics` tabs. The `GO` button in the filters tab of this app loads the
+                                maps with the currently selected filters applied.")
+                        ,tags$h3("Filtering the Data")
+                        ,tags$h5("Users can apply filters to the data to restrict down to only stops with certain
+                                 characteristics. For an example: if you would like to see maps of only white female 
+                                 drivers who were stopped for speeding and arrested as a result of the stop, you would
+                                 check the boxes for `White`, `Female`, `Speeding`, and `Arrest`. If you check two boxes
+                                 for mutually explusive categories (Male and Female or warning and arrest) there will
+                                 be no data left to create the map. To apply filters to the data, click any `GO` button 
+                                 in this app.")
+                        ,tags$h3("Hit Rates")
+                        ,tags$h5("This map shows the percentage of searches which led to finding contraband (illegal items
+                        such as scheduled substances or unregistered weapons.) A low search hit rate can imply that police are 
+                        oversearching motorists in that area of the city or of a certain demographic. Keep in mind that in areas
+                        with not many stops there might be an abnormally low or high hit rate due to statistical noise. Click
+                        on each census tract to reveal it's numberical identifier, exact search hit rate, and the number of searches
+                        conducted there. If the map isn't loading, be sure you visited the `filters` tab and clicked the `GO` button.")
+                        ,tags$h3("Demographics")
+                        ,tags$h5("This map shows the demographics of stopped drivers in different areas of the Columbia. The shading
+                        of each census tract represents the share of non-white drivers stopped in that area. Click on each census tract to 
+                        reveal information about the drivers who were stopped there. If the map isn't loading, be sure you visited the
+                        `filters` tab and clicked the `GO` button.")
+                        ,tags$h3("Download the Raw Data")
+                        ,tags$h5("Click the download button to download the raw data used to create this map as a .csv file. 
+                        Your filters will not affect the downloaded copy of the data."))
+        
                 #filter tab
-                tabItem(
+                ,tabItem(
 
                                 tabName = 'filters'
                         ,tags$h1("Filter the Data")
-                        ,tags$h6("For each category, you can remove different types of motorists from the
-                                maps by unchecking their corresponding box. For an example, if you would 
-                                like to see only stops of non-white motorists, uncheck the box labeled White.")
+                        ,tags$h5("For each category, you can filter the stops data to include only stops where
+                                 a selected attribute applies. Try not to select mutually exclusive categories!")
 
                         ,tags$h3("Demographics")
                         ,checkboxInput("white_internal", "White")
@@ -100,7 +132,7 @@ body <- dashboardBody(
                 
                 ,tabItem(tabName = "rawdata"
                          , box(width = 8, title="Download the Raw Data"
-                         , tags$h6("Click the link below to download the traffic stops data used to generate
+                         , tags$h5("Click the link below to download the traffic stops data used to generate
                                    these maps. The output file will be a .csv file, openable by excel, as well as
                                    statistical programs like R and STATA.")
                         ,downloadLink("COMOPDTrafficStopsData.csv", "Download CSV")))
@@ -131,28 +163,28 @@ server <- function(input, output, session) {
                 print("yes")
                 filterer<-rep(T, nrow(stops))
         } else {
-                filterer<-rep(F, nrow(stops)) 
-                if(input$white_internal){filterer[stops$race=="W"]<-T}
-                if(input$black_internal){filterer[stops$race=="B"]<-T}
-                if(input$hispanic_internal){filterer[stops$race=="H"]<-T}
-                if(input$asian_internal){filterer[stops$race=="A"]<-T}
-                if(input$native_american_internal){filterer[stops$race=="I"]<-T}
-                if(input$male_internal){filterer[stops$gender=="M"]<-T}
-                if(input$female_internal){filterer[stops$gender=="F"]<-T}
-                if(input$under_18_internal){filterer[stops$age=="Under 18"]<-T}
-                if(input$under_29_internal){filterer[stops$age=="18--29"]<-T}
-                if(input$under_39_internal){filterer[stops$age=="30--39"]<-T}
-                if(input$above_40_internal){filterer[stops$age=="40+"]<-T}
-                if(input$speed_internal){filterer[stops$speed=="1"]<-T}
-                if(input$lane_violation_internal){filterer[stops$lane_violation=="1"]<-T}
-                if(input$follow_to_close_internal){filterer[stops$follow_to_close=="1"]<-T}
-                if(input$fail_to_signal_internal){filterer[stops$fail_to_signal=="1"]<-T}
-                if(input$equipment_internal){filterer[stops$equipment=="1"]<-T}
-                if(input$license_internal){filterer[stops$license=="1"]<-T}
-                if(input$search_internal){filterer[stops$what_searched!=""]<-T}
-                if(input$citation_internal){filterer[stops$citation=="1"]<-T}
-                if(input$warning_internal){filterer[stops$warning=="1"]<-T}
-                if(input$driver_arrest_internal){filterer[stops$driver_arrest=="YES"]<-T}
+                filterer<-rep(T, nrow(stops)) 
+                if(input$white_internal){filterer[stops$race!="W"]<-F}
+                if(input$black_internal){filterer[stops$race!="B"]<-F}
+                if(input$hispanic_internal){filterer[stops$race!="H"]<-F}
+                if(input$asian_internal){filterer[stops$race!="A"]<-F}
+                if(input$native_american_internal){filterer[stops$race!="I"]<-F}
+                if(input$male_internal){filterer[stops$gender!="M"]<-F}
+                if(input$female_internal){filterer[stops$gender!="F"]<-F}
+                if(input$under_18_internal){filterer[stops$age!="Under 18"]<-F}
+                if(input$under_29_internal){filterer[stops$age!="18--29"]<-F}
+                if(input$under_39_internal){filterer[stops$age!="30--39"]<-F}
+                if(input$above_40_internal){filterer[stops$age!="40+"]<-F}
+                if(input$speed_internal){filterer[stops$speed!="1"]<-F}
+                if(input$lane_violation_internal){filterer[stops$lane_violation!="1"]<-F}
+                if(input$follow_to_close_internal){filterer[stops$follow_to_close!="1"]<-F}
+                if(input$fail_to_signal_internal){filterer[stops$fail_to_signal!="1"]<-F}
+                if(input$equipment_internal){filterer[stops$equipment!="1"]<-F}
+                if(input$license_internal){filterer[stops$license!="1"]<-F}
+                if(input$search_internal){filterer[stops$what_searched!=""]<-F}
+                if(input$citation_internal){filterer[stops$citation!="1"]<-F}
+                if(input$warning_internal){filterer[stops$warning!="1"]<-F}
+                if(input$driver_arrest_internal){filterer[stops$driver_arrest!="YES"]<-F}
         }
         
         filtered_stops<-stops %>% filter(filterer)
