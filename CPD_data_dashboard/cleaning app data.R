@@ -58,4 +58,8 @@ stops<-stops %>% filter(GEOID20 !="29107090601")
 #making a cleaner version of the data to download
 download<-stops %>% as.data.frame() %>% select(-c(59:71)) 
 
+#troubleshooting
+st_crs(stops) = 4326
+st_crs(tracts) = 4326
+
 save(download, stops, tracts, file="E:/Police_Work_2021/CPD_data_dashboard/data/app_data.R")
