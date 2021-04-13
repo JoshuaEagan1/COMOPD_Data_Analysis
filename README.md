@@ -7,7 +7,7 @@ These projects will shed light on different aspects of traffic policing in Colum
 There are a few main products I will make available to COMOPD, Columbia's Civilian Police Review Board, and the public. 
 
 ### COMOPD Data Dashboard
-I am designing a data dashboard that will empower people who want to know more about what traffic stops look like to explore the data in user friendly, customizable environment.
+I designed a data dashboard that will empower people who want to know more about what traffic stops look like to explore the data in user friendly, customizable environment. <https://jeagan.shinyapps.io/cpd_data_dashboard/>
 
 ### Veil of Darkness Analysis
 I will be releasing a report that analyses Columbia's traffic stops data for racial discrimination against black drivers. This test leverages as-good-as-random variation in visibility between daylight and darkness to test for discrimination against black motorists. Controlling for where traffic stops take place and when they take place, officers should be less able to observe the race of motorists just after sunset relative to just before sunset. Therefore, if the likelihood that a stopped driver is black decreases significantly after sunset, this is evidence of racial discrimination against black motorists.

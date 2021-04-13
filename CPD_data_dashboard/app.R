@@ -85,36 +85,47 @@ body <- dashboardBody(
                         ,tags$h1("Filter the Data")
                         ,tags$h5("For each category, you can filter the stops data to include only stops where
                                  a selected attribute applies. Try not to select mutually exclusive categories!")
-
-                        ,tags$h3("Demographics")
-                        ,checkboxInput("white_internal", "White")
-                        ,checkboxInput("black_internal", "Black")
-                        ,checkboxInput("hispanic_internal", "Hispanic")
-                        ,checkboxInput("asian_internal", "Asian")
-                        ,checkboxInput("native_american_internal", "Native American")
-                        ,checkboxInput("male_internal", "Male")
-                        ,checkboxInput("female_internal", "Female")
-                        ,checkboxInput("under_18_internal", "Under 18 Years Old")
-                        ,checkboxInput("under_29_internal", "18 to 29 Years Old")
-                        ,checkboxInput("under_39_internal", "30 to 39 Years Old")
-                        ,checkboxInput("above_40_internal", "40 Years Old or Older")
+                        ,box(
+                                title = "Demographics", width = 4, solidHeader = TRUE
+                                ,checkboxInput("white_internal", "White")
+                                ,checkboxInput("black_internal", "Black")
+                                ,checkboxInput("hispanic_internal", "Hispanic")
+                                ,checkboxInput("asian_internal", "Asian")
+                                ,checkboxInput("native_american_internal", "Native American")
+                                ,checkboxInput("male_internal", "Male")
+                                ,checkboxInput("female_internal", "Female")
+                                ,checkboxInput("under_18_internal", "Under 18 Years Old")
+                                ,checkboxInput("under_29_internal", "18 to 29 Years Old")
+                                ,checkboxInput("under_39_internal", "30 to 39 Years Old")
+                                ,checkboxInput("above_40_internal", "40 Years Old or Older"))
                         
-                        ,tags$h3("Reason for Stop")
+                        
+                        ,box(
+                                title = "Reason for Stop", width = 4, solidHeader = TRUE
                         ,checkboxInput("speed_internal", "Speeding")
                         ,checkboxInput("lane_violation_internal", "Lane Violation")
                         ,checkboxInput("follow_to_close_internal", "Follow to Close")
                         ,checkboxInput("fail_to_signal_internal", "Fail to Signal")
                         ,checkboxInput("equipment_internal", "Equipment Violation")
-                        ,checkboxInput("license_internal", "License")
+                        ,checkboxInput("license_internal", "License"))
                         
-                        ,tags$h3("Result of Stop")
+                        ,box(
+                                title = "Time Filter", width = 4, solidHeader = TRUE
+                        ,dateInput("date1", "Beginning Date:", value = "2014-01-01")
+                        
+                        # Default value is the date in client's time zone
+                        ,dateInput("date2", "Ending Date:", value = "2019-12-031"))
+                        
+                        ,box(
+                                title = "Result of Stop", width = 4, solidHeader = TRUE
                         ,checkboxInput("search_internal", "Search")
                         ,checkboxInput("citation_internal", "Citation")
                         ,checkboxInput("warning_internal", "Warning")
-                        ,checkboxInput("driver_arrest_internal", "Arrest")
+                        ,checkboxInput("driver_arrest_internal", "Arrest"))
                         
-                        ,tags$h3("Apply Filters")
-                        ,actionButton("filter_button", "GO"))
+                        ,box(
+                                title = "Apply Filters", width = 4, solidHeader = TRUE
+                        ,actionButton("filter_button", "GO")))
                 
                 #hit rates tab
                 ,tabItem(
@@ -188,6 +199,9 @@ server <- function(input, output, session) {
         }
         
         filtered_stops<-stops %>% filter(filterer)
+        
+        #filtering by time
+        filtered_stops<-filtered_stops %>% filter((filtered_stops$calltime >= input$date1)&(filtered_stops$calltime <= input$date2))
         
         ###
         
