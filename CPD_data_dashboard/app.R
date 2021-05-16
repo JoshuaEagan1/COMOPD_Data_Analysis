@@ -13,6 +13,7 @@ library(RColorBrewer)
 library(leaflet)
 library(shiny)
 library(shinydashboard)
+library(shinycssloaders)
 
 ##############################################################################
 
@@ -37,6 +38,7 @@ sidebar <- dashboardSidebar(
                 , menuItem("Filters", tabName = "filters")
                 , menuItem("Hit Rates", tabName = "hit_rates")
                 , menuItem("Demographics", tabName = "by_race")
+                , menuItem("Reason for Stop", tabName = "by_reason")
                 , menuItem('Download the Raw Data', tabName = 'rawdata')
                 
         )
@@ -48,45 +50,53 @@ body <- dashboardBody(
                 
                 #description tab
                 tabItem(tabName = 'How_to_Use_this_Tool'
-                        ,tags$h1("How to Use this Tool")
-                        ,tags$h5("This tool is intended to help you explore the publicly released data on traffic
-                                stops by Columbia Police Department from 2014-2019. Stops are broken down by the
-                                2020 Census tract boundary they occurred within in the `Hit Rates by Census Tract`
-                                and `Demographics` tabs. The `GO` button in the filters tab of this app loads the
+                        ,tags$h1("How to Use this Dashboard")
+                        ,tags$h5("This app is intended to help you explore the publicly released data on traffic
+                                stops from Columbia, Missouri's Police Department from 2014-2019. Stops are displayed at the
+                                2020 Census tract level in the ", tags$b("Hit Rates by Census Tract"),
+                                ", ", tags$b("Demographics"), ", and ", tags$b("Reason for Stop"), " tabs. The ", tags$b("GO")," button in the ", tags$b("filters"), " tab of this app recreates the
                                 maps with the currently selected filters applied.")
                         ,tags$h3("Filtering the Data")
                         ,tags$h5("Users can apply filters to the data to restrict down to only stops with certain
                                  characteristics. For an example: if you would like to see maps of only white female 
                                  drivers who were stopped for speeding and arrested as a result of the stop, you would
-                                 check the boxes for `White`, `Female`, `Speeding`, and `Arrest`. If you check two boxes
-                                 for mutually explusive categories (Male and Female or warning and arrest) there will
-                                 be no data left to create the map. To apply filters to the data, click any `GO` button 
-                                 in this app.")
+                                 check the boxes for: ", tags$b("White"), ", " , tags$b("Female"), ", ", tags$b("Speeding"), ", and ", tags$b("Arrest"),
+                                ". If you check two boxes for mutually explusive categories (Male and Female or warning and arrest) there will
+                                 be no stops left to create the map. To apply filters to the data, click the ", tags$b("GO"), " button 
+                                 in the ", tags$b("filters"), " tab of this app.")
                         ,tags$h3("Hit Rates")
                         ,tags$h5("This map shows the percentage of searches which led to finding contraband (illegal items
                         such as scheduled substances or unregistered weapons.) A low search hit rate can imply that police are 
                         oversearching motorists in that area of the city or of a certain demographic. Keep in mind that in areas
-                        with not many stops there might be an abnormally low or high hit rate due to statistical noise. Click
-                        on each census tract to reveal it's numberical identifier, exact search hit rate, and the number of searches
-                        conducted there. If the map isn't loading, be sure you visited the `filters` tab and clicked the `GO` button.")
+                        with a small number of stops might have an abnormally low or high hit rate due to statistical noise. Click
+                        on each census tract to reveal it's numerical identifier, exact search hit rate, and the number of searches
+                        conducted there. If the map isn't loading, revisit the ", tags$b("filters"), " tab and click the ", tags$b("GO"), " button.")
                         ,tags$h3("Demographics")
                         ,tags$h5("This map shows the demographics of stopped drivers in different areas of the Columbia. The shading
-                        of each census tract represents the share of non-white drivers stopped in that area. Click on each census tract to 
-                        reveal information about the drivers who were stopped there. If the map isn't loading, be sure you visited the
-                        `filters` tab and clicked the `GO` button.")
+                        of each census tract represents the share of stopped drivers who are non-white in that area. Click on each census tract to 
+                        reveal information about the drivers who were stopped there. If the map isn't loading, revisit the ", tags$b("filters"), " tab and click the ", tags$b("GO"), " button.")
+                        ,tags$h3("Reason for Stop")
+                        ,tags$h5("This map shows the reasons motorists were stopped in different areas of the Columbia. The purple shading
+                        of each census tract represents the share of drivers stopped for equipment violations in that area. 
+                        Keep in mind that drivers can be stopped for multiple reasons. Click on each census tract to 
+                        see a breakdown of the reasons drivers were stopped there. If the map isn't loading, revisit the ",
+                        tags$b("filters"), " tab and click the ", tags$b("GO"), " button.")
+                        
                         ,tags$h3("Download the Raw Data")
-                        ,tags$h5("Click the download button to download the raw data used to create this map as a .csv file. 
+                        ,tags$h5("Click the ", tags$b("Download CSV"), " button to download the raw data used to create this map as a .csv file. 
                         Your filters will not affect the downloaded copy of the data."))
         
                 #filter tab
-                ,tabItem(
-
-                                tabName = 'filters'
+                ,tabItem(tabName = 'filters'
+                        ,fluidRow(
+                                column(width = 12
                         ,tags$h1("Filter the Data")
                         ,tags$h5("For each category, you can filter the stops data to include only stops where
-                                 a selected attribute applies. Try not to select mutually exclusive categories!")
-                        ,box(
-                                title = "Demographics", width = 4, solidHeader = TRUE
+                                 a selected attribute applies. Don't select mutually exclusive categories: there will be no stops left to make the maps.")))
+                        , fluidRow(
+                                column(4
+                                        ,box(
+                                title = "Demographics", width = 12, solidHeader = TRUE
                                 ,checkboxInput("white_internal", "White")
                                 ,checkboxInput("black_internal", "Black")
                                 ,checkboxInput("hispanic_internal", "Hispanic")
@@ -98,47 +108,57 @@ body <- dashboardBody(
                                 ,checkboxInput("under_29_internal", "18 to 29 Years Old")
                                 ,checkboxInput("under_39_internal", "30 to 39 Years Old")
                                 ,checkboxInput("above_40_internal", "40 Years Old or Older"))
-                        
-                        
+                                )
+                                ,column(4
                         ,box(
-                                title = "Reason for Stop", width = 4, solidHeader = TRUE
-                        ,checkboxInput("speed_internal", "Speeding")
-                        ,checkboxInput("lane_violation_internal", "Lane Violation")
-                        ,checkboxInput("follow_to_close_internal", "Follow to Close")
-                        ,checkboxInput("fail_to_signal_internal", "Fail to Signal")
-                        ,checkboxInput("equipment_internal", "Equipment Violation")
-                        ,checkboxInput("license_internal", "License"))
-                        
+                                title = "Reason for Stop", width = 12, solidHeader = TRUE
+                                ,checkboxInput("speed_internal", "Speeding")
+                                ,checkboxInput("lane_violation_internal", "Lane Violation")
+                                ,checkboxInput("follow_to_close_internal", "Follow to Close")
+                                ,checkboxInput("fail_to_signal_internal", "Fail to Signal")
+                                ,checkboxInput("equipment_internal", "Equipment Violation")
+                                ,checkboxInput("license_internal", "License"))
                         ,box(
-                                title = "Time Filter", width = 4, solidHeader = TRUE
+                                title = "Apply Filters", width = 12, solidHeader = TRUE
+                                ,actionButton("filter_button", "GO"))
+                                )
+                                ,column(4
+                        ,box(
+                                title = "Time Filter", width = 12, solidHeader = TRUE, color = "blue"
                         ,dateInput("date1", "Beginning Date:", value = "2014-01-01")
                         
                         # Default value is the date in client's time zone
-                        ,dateInput("date2", "Ending Date:", value = "2019-12-031"))
+                        ,dateInput("date2", "Ending Date:", value = "2019-12-31"))
                         
                         ,box(
-                                title = "Result of Stop", width = 4, solidHeader = TRUE
-                        ,checkboxInput("search_internal", "Search")
-                        ,checkboxInput("citation_internal", "Citation")
-                        ,checkboxInput("warning_internal", "Warning")
-                        ,checkboxInput("driver_arrest_internal", "Arrest"))
-                        
-                        ,box(
-                                title = "Apply Filters", width = 4, solidHeader = TRUE
-                        ,actionButton("filter_button", "GO")))
+                                title = "Result of Stop", width = 12, solidHeader = TRUE
+                                ,checkboxInput("search_internal", "Search")
+                                ,checkboxInput("citation_internal", "Citation")
+                                ,checkboxInput("warning_internal", "Warning")
+                                ,checkboxInput("driver_arrest_internal", "Arrest"))
+                                )
+                        )
+                )
                 
                 #hit rates tab
                 ,tabItem(
                         tabName = 'hit_rates'
                         ,tags$h3("Hit Rates by Census Tract")
-                        ,leafletOutput("map1"))
+                        ,leafletOutput("map1") %>% withSpinner(type=4))
                 
                 
                 #stops by race tab
                 ,tabItem(
                         tabName = 'by_race'
                         ,tags$h3("Stop Demographics by Census Tract")
-                        ,leafletOutput('map2')
+                        ,leafletOutput('map2') %>% withSpinner(type=4)
+                )
+                
+                #stops by reason tab
+                ,tabItem(
+                        tabName = 'by_reason'
+                        ,tags$h3("Reason for Stop by Census Tract")
+                        ,leafletOutput('map3') %>% withSpinner(type=4)
                 )
                 
                 ,tabItem(tabName = "rawdata"
@@ -202,9 +222,7 @@ server <- function(input, output, session) {
         
         #filtering by time
         filtered_stops<-filtered_stops %>% filter((filtered_stops$calltime >= input$date1)&(filtered_stops$calltime <= input$date2))
-        
-        ###
-        
+
         #aggregate the stops
         grouped_stops<- filtered_stops %>% group_by(GEOID20) %>%
                 summarise(hit_rate=mean(contraband_found=="Yes")/mean(!what_searched==""), number_of_searches=sum(what_searched!=""),
@@ -212,11 +230,21 @@ server <- function(input, output, session) {
                           OtherRace=mean(race!="W"&race!="B"), Male=mean(gender=="M"), 
                           Female=mean(gender=="F"), Below_30=mean(age %in% c("18--29", "Under 18")),
                           Above_29=mean(age %in% c("40+", "30--39")),
-                          propNonwhite=mean(race!="W"), total=n())
+                          propNonwhite=mean(race!="W"), total=n(),
+                          propSpeed=mean(speed=="1", na.rm=T),
+                          propLV=mean(lane_violation=="1", na.rm=T),
+                          propFTC=mean(follow_to_close=="1", na.rm=T),
+                          propFTS=mean(fail_to_signal=="1", na.rm=T),
+                          propMoving=mean(moving=="1", na.rm=T),
+                          propEquipment=mean(equipment=="1", na.rm=T),
+                          propLicense=mean(license=="1", na.rm=T),
+                          propInvestigative=mean(investigative=="1", na.rm=T)
+
+                          )
         
         #merging hit rates back in
         tracts<-tracts %>% filter(GEOID20 %in% grouped_stops$GEOID20)
-        grouped_stops<-grouped_stops %>% as.data.frame() %>% select(-13)
+        grouped_stops<-grouped_stops %>% as.data.frame() %>% select(-21) #remove geometry
         grouped_stops<-merge(tracts, grouped_stops)
         grouped_stops<-st_transform(grouped_stops, "+init=epsg:4326")
         
@@ -290,7 +318,47 @@ server <- function(input, output, session) {
                                 title = paste('Proportion Non-White Stopped'))
         })
         
-        }) #end observe event button
+        #making the hit rates popup
+        violation_popup <- paste0("<strong>Census Tract Identifier: </strong>", 
+                                 paste0(grouped_stops$GEOID20), 
+                                 "<br><strong>Percent Stopped for Speeding: </strong>", 
+                                 paste0(round(grouped_stops$propSpeed, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for Lane Violation: </strong>", 
+                                 paste0(round(grouped_stops$propLV, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for Following to Close: </strong>", 
+                                 paste0(round(grouped_stops$propFTC, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for Failure to Signal: </strong>", 
+                                 paste0(round(grouped_stops$propFTC, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for Moving Violation: </strong>", 
+                                 paste0(round(grouped_stops$propMoving, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for Equipment Violation: </strong>", 
+                                 paste0(round(grouped_stops$propEquipment, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for License: </strong>", 
+                                 paste0(round(grouped_stops$propLicense, 3)*100, "%"),
+                                 "<br><strong>Percent Stopped for Investigation: </strong>", 
+                                 paste0(round(grouped_stops$propInvestigative, 3)*100, "%"),
+                                 "<br><strong>Total Number of Stops: </strong>", 
+                                 paste0(grouped_stops$total))
+        
+        #making the color ramp
+        pal3<-colorNumeric(palette = c("white","purple"), domain=grouped_stops$propEquipment)
+        
+        #compiling hit rates leaflet
+        output$map3<-renderLeaflet({
+                l<-leaflet(data = grouped_stops) %>% addTiles() %>%
+                        addPolygons(color = "#444444", 
+                                    weight=1,
+                                    fillColor = pal3(grouped_stops$propEquipment), 
+                                    popup=violation_popup,
+                                    highlightOptions = highlightOptions(color = "white", weight = 2,
+                                                                        bringToFront = TRUE))
+                l %>% addLegend(position="bottomright", 
+                                pal=pal3,
+                                values=~hit_rate,
+                                title = paste('Proportion of Stops for Equipment Violation by Census Tract'))
+        })
+        
+        }, ignoreNULL = FALSE) #end observe event button
         
         output$COMOPDTrafficStopsData.csv <- downloadHandler(
                 filename = "COMOPDTrafficStopsData.csv",
