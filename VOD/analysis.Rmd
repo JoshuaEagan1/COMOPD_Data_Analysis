@@ -1,0 +1,284 @@
+---
+title: "Veil of Darkness Analysis"
+author: "Joshua Eagan"
+date: "October 21, 2021"
+output: pdf_document
+abstract: "In this report, I analyze data on traffic stops from Columbia, Missouri from 2014-2020 to estimate the extent of racial bias in the decision to stop motorists using the Veil of Darkness methodology. I find that the decision to stop Black motorists was likely discriminatory, with police officers approximately 3% more likely to stop Black motorists when race was known prior to making a traffic stop. These effects are concentrated in the early years of the study with no evidence of racial profiling in recent years. This report is reproducible, with all code available on Github: https://github.com/JoshuaEagan1/COMOPD_Data_Analysis."
+bibliography: ["references.bib"]
+fontsize: 12pt
+
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+#importing packages
+library(tidyverse)
+library(tables)
+library(sf)
+library(fixest)
+library(viridis)
+
+#importing data and quick cleaning
+load("E:/Police_Work_2021/standardized_traffic_stops_data_20211014.R")
+stops<-stops %>% mutate(black=case_when(race=="B"~1, T~0),
+                        continuousHours=as.numeric(substr(time, 1, 2))+
+                                (as.numeric(substr(time, 4, 5))/60)+
+                                (as.numeric(substr(time, 7, 8))/3600),
+                        DoW=weekdays(calltime))
+stops<-stops %>% mutate(amHour=case_when(continuousHours>12~0, T~as.numeric(continuousHours)),
+                        pmHour=case_when(continuousHours<12~0, T~as.numeric(continuousHours)))
+stops$DoW<-as.factor(stops$DoW)
+
+#specifying the observations used in the veil of darkness analysis
+veil_subset<-ifelse(stops$intertwilight==1 & stops$twilight==0 & stops$investigative==0, 1, 0)
+
+```
+
+## Introduction
+
+In recent years, an abundance of research has attempted to answer questions related to the existence and extent of racial bias in different institutions of the criminal justice system. This has been possible due to the discovery of "natural experiments" embedded within the criminal justice system that allow researchers to isolate quasi-random variation in exposure to decision makers and situations where discrimination is possible. Recent projects that exploit the random assignment of criminal justice actors to situations have provided strong evidence of racial bias in settings such as bail bond hearings [@arnold_racial_2018], police use of force decisions [@hoekstra_does_2020], and police investigations [@West2015RacialBI]. 
+
+
+The literature on racial bias in police encounters during routine traffic stops was slow to develop. Since police officers are often able to "select into" these encounters with civilians, and data collected about traffic stops do not include information about drivers who were not stopped despite their traffic violations, this is a difficult setting to isolate the random variation needed to determine whether police officers are racially biased. Lack of a counterfactual group to compare the proportion of stopped drivers who are Black to has been a primary concern of this literature. Early studies used information from the US Census Bureau as a counterfactual [@stacey_veil_2021], but these comparisons rely on the assumption that drivers do not differ by race in any key aspects relating to stop decisions. However, it is well established that drivers differ by race in many important economic and social indicators, and that these differences influence disparities in traffic stops violating the above assumption.^[[National Institute of Justice, US department of Justice](https://www.nij.gov/topics/law-enforcement/legitimacy/pages/traffic-stops)] 
+
+
+In 2006, a quasi-experimental design called Veil of Darkness was first implemented [@grogger_testing_2006]. This approach exploits the annual variability in daylight to compare traffic stops during daylight (when the race of a motorist is likely visible prior to a stop) to stops that occur at night (when it is unlikely that the race of a motorist can be observed by an officer prior to making a stop). Although not all researchers agree on the details about the best way to implement this strategy [@stacey_veil_2021], the Veil of Darkness Model has been the most widely used test of racial bias in routine traffic stops since it was created. Many papers have sought to extend this methodology since its creation. @horrace_how_2016 account for the location of streetlights which mitigates a serious concern for this methodology: a weak relationship between the visibility of drivers and daylight. @taniguchi_extending_2017 use a modeling structure (GLS) that allows the assumption that stops are independent and identically distributed (IID) to be relaxed, decompose the effects of driver race by gender, and test for differences in racial profiling behavior between different police patrols. @milyo_dwb_2018 uses the Veil of Darkness methodology to screen Columbia, Missouri's traffic stops data for racial bias from 2014-2017. He finds significant evidence of racial bias in 2014-2015 but not in 2016-2017. In this paper, I conduct the Veil of Darkness test on the sample of traffic stops from Columbia, Missouri adding data on stops that happened from 2018 to 2020. 
+
+
+## Data
+
+To create the main data set used in this analysis, I implement many data cleaning strategies. The backbone of these data contains 91,469 records, each representing a traffic stop made by Columbia Police Department during the period of 2014-2020. Individual files containing the stops for each year are publicly available on Columbia Police Department's website.^[<https://www.como.gov/police/data-reporting-forms/>] These data contain information on where and when traffic stops took place, characteristics of the drivers stopped, and why each driver was stopped. Since the Veil of Darkness methodology requires information about whether each stop occurred during day, twilight, or night, I create new variables for these using data on the seasonal variability in sunlight throughout the year in Columbia.^[Daylight information was obtained from the following website: <https://www.timeanddate.com/sun/>] 
+
+
+One reliability issue in these data is that at some point in 2018, the procedure for the collection of the categorical variable for what type of street each stop occurred on changed. Before the procedure change, this field was calculated based on a street address text variable using a text look-up strategy. After the change, this field is recorded by the officers themselves. I employ a strategy similar to the pre-2018 coding procedure, using text look-ups and comparisons with the data from 2014-2017 to re-assign this variable for all years, including 2018-2020.^[I confirmed this via email with COMOPD's crime analyst, Jerry East.] I find that my strategy has a 4% error rate using the prior recording of this variable as a benchmark. Another issue is that I am unable to access data on which police beat each stop occurred in for 2019, although I have this information for 2014-2018 and 2020. I employ a similar strategy to reassign beats to each stop for all years (including 2019) using the non-2019 years as a benchmark. Instead of using text look-ups on the address field, I use Google Maps Geocoding API to create new fields for longitude and latitude of each stop using the address field and intersect these locations with the US Census Bureau's 2020 TIGER/Line block shape file to assign each stop a Census block.^[<https://developers.google.com/maps/documentation/geocoding/overview>] ^[<https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html>] Next, I assign each Census block a police beat by calculating the mode value of the beat variable for each block. Finally, I assign the stops from each block the mode value of the beat variable from the previous steps.
+
+The primary mode of analysis in this paper, Veil of Darkness, only examines a subset of the data on traffic stops (see the Methodology section for more information.) See the summary statistics below for the subset included in the Veil of Darkness analysis and the subset that won't be included. 
+
+### Table 1: Summary Statistics
+
+```{r}
+#Summary Statistics
+
+#change this table
+sumstats<-stops %>% 
+        mutate(male=case_when(gender=="M"~1, T~0),
+               young=case_when(age=="Under 18"|age=="18--29"~1, T~0),
+               arrest=case_when(driver_arrest=="YES"~1, T~0),
+               veilSubset= veil_subset)%>%
+        select(cdark, black, male, young, moving, equipment, license, citation, warning, arrest, veilSubset)
+sumstats[] <- data.frame(lapply(sumstats, as.numeric))
+sumstats$veilSubset <- factor(sumstats$veilSubset)
+sumstats<-tabular(black + male + young + moving + equipment + license + citation + warning + arrest + cdark ~ veilSubset *Format(digits=2)* (mean+sd) , data=sumstats)
+attributes(sumstats)$colLabels[3,]<-c("Mean", "SD",   "Mean", "SD")
+attributes(sumstats)$colLabels[1,1]<-"Veil Subset"
+sumstats
+```
+
+
+As we can see in the table above, the summary statistics for the Veil of Darkness survey sample (where Veil Subset$=1$) do not look far different than the summary statistics for the sample of stops not being used in the analysis. 31% of stopped drivers are Black both in the Veil of Darkness sample and in the rest of the population of drivers stopped in Columbia between 2014-2020. In the Veil of Darkness survey sample, about 63% of stops happen at night. Most stopped drivers are male, and most are let off with a warning as the outcome of the stop. The most common reason for a stop was a moving violation, at roughly 40% of total stops in the Veil of Darkness sample. The biggest difference between the Veil of Darkness subset and the rest of the stops is the reason each driver was stopped: roughly 50% of stops for the rest of the population of stopped drivers are for moving violations.
+
+## Methodology
+
+As an experimental ideal, one would randomly assign officers to a treatment group where officers' ability to see into vehicles prior to making a stop was removed. We would then compare the percentage of drivers stopped who were Black between this treatment group to a control group who maintained their ability to observe driver race before making a stop. In practice, this would be unethical and infeasible. To implement a feasible test, I use the following linear probability model to predict the probability that a stopped driver is Black, $\text{Pr}(B_i=1 | X_i)$.
+
+### Equation 1: Naive Veil of Darkness Model
+$$B_{i}=\beta_0 + \beta_1 D_i + \epsilon_i$$
+Since police officers are often able to see into the cab of a car during day but not at night when it is too dark, it is possible to compare the subset of drivers stopped during day to drivers stopped at night using information about daylight. Our key identifying assumption is that officers can observe race more clearly during daylight than at night, excluding periods of civil twilight. Civil twilight refers to the time when the sun is $6^\circ$ below the horizon, when artificial illumination is needed to carry out ordinary daily activities.^[This is according to the definition in [this document originally shared by the US Naval Observatory in 2019](https://academics.uccs.edu/rtirado/PES_1600_SolarEnergy/Horizon_Rise_Set_Twilight.pdf)] If this assumption is true, we have a quasi-experimental test for racial bias in traffic stops. If drivers stopped during darkness ($D_i=1$) are significantly less likely to be Black, this is evidence for policing that is discriminatory against Black drivers. In other words, if in estimating the equation above, the coefficient $\beta_1$ is negative and statistically different from 0 then we reject the null hypothesis that police officers are not using racial profiling in their decision to stop motorists. Since officers who make stops during twilight may or may not be able to observe the race of the drivers they are stopping during this period, twilight stops ($\alpha_i=1$) are dropped from the sample. This strategy was first employed by @grogger_testing_2006 to test for racial bias in policing in Oakland, CA and has since become the preferred method to screen traffic stop data for racial bias. 
+
+
+In Model 1, there are omitted variables that correlate with both $B_i$ and $D_i$ One such variable is clock time. Since clock time and weekday are both likely to affect the racial composition of drivers on the road, I add fixed effects for day of week interacted with time that each stop took place (in continuous hours). To allow the effect of clock time to have different effects during the AM and PM hours, I compute two sets of these interactions- one for AM hours (0 otherwise) and one for PM hours (0 otherwise.) I also add fixed effects for month and year. I restrict my analysis to focus only on stops that occur during times of day that could be either day or night depending on the time of year, the inter-twilight period ($\gamma=1$). These controls allow the Veil of Darkness model to leverage the yearly variability in daylight, causing restriction of $\beta_1$ to only compare stops at the same time of day (but with different levels of daylight.)
+
+### Figure 1: Veil of Darkness Illustration
+
+```{r, fig.align="center"}
+stops[stops$year %in% c(2019:2020),] %>%
+mutate(Light=case_when(cdark==1&twilight==0~"Night",
+                       cdark==1&twilight==1~"Twilight",
+                       cdark==0~"Day")) %>%
+ggplot()+
+        geom_point(aes(as.Date(calltime), continuousHours, color=Light))+
+        scale_color_manual(values=c("skyblue", "black", "orange"))+
+        ylim(0,24)+
+        theme_bw()+
+        geom_hline(aes(yintercept = 5.186389), color="gold")+
+        geom_hline(aes(yintercept = 7.686389), color="gold")+
+        geom_hline(aes(yintercept = 16.78361), color="gold")+
+        geom_hline(aes(yintercept = 21.18333), color="gold")+
+        xlab("Date") + ylab("Clock Time in Hours (0-24)")+
+        scale_y_continuous(breaks = 4*c(0:6))
+```
+
+Figure 1 sheds light on how this model works. Each point represents one traffic stop and color shows whether each stop occurred during day, night, or twilight. The horizontal axis represents day of year, and the vertical axis represents time of day. Gold lines mark the beginning and end of the morning and evening inter-twilight periods (5:11 AM and 7:42 AM in the morning and 4:47 PM and 9:11 PM in the evening). As we can see, stops suddenly become sparse in March of 2020, a period that coincides with the beginning of the COVID-19 pandemic and the beginning of Columbia's quarantine order in response to the pandemic.
+
+
+Even with the introduction of temporal controls, ($T_{it}$), the Veil of Darkness model still suffers from omitted variable bias. This is because the racial composition of drivers varies by neighborhood. Therefore, spatial controls, ($S_{ij}$), are necessary as well. I introduce a set of fixed effects to the model for the police beat each stop occurred in and another set of fixed effects for the type of street each stop took place on (city street, state highway, interstate, etc.) With the model now specified to force estimation of $\beta_1$ within each of the temporal and spatial controls, it is properly identified to capture the treatment effect of darkness on the probability that a stopped driver is Black.
+
+\newpage
+
+### Equation 2: Practical Veil of Darkness Model
+$$B_{ijt}=\beta_0 + \beta_1 D_{i} + \beta_2 T_{t} + \beta_3 S_{ij} + \epsilon_{ijt}$$
+$$\text{ where }\alpha=0 \text{  and  } \gamma = 1$$
+In the above equation, $T_{it}$ is an $n\times 35$ matrix of the temporal controls, $S_{ij}$ is an $n\times 14$ matrix of the spatial controls, $\beta_2$ is a $35\times 1$ vector, and $\beta_3$ is a $14\times 1$ vector. Using the OLS estimator, I estimate $\beta_0$, $\beta_1$, $\beta_2,$ and $\beta_3$ to minimize $\sum\limits_{i=1}^n\epsilon_{ijt}^2$ recovering the treatment effect, $\beta_1$.
+
+While properly identified under the previously mentioned assumption, that race is more visible during daylight than at night, any factors that increase police officers' ability to observe race prior to making stops at night will bias $\beta_1$ toward zero. Conversely, any factors that decrease police officers' ability to determine the race of motorists during daylight will have the same effect. Some omitted variables that could fall into this category are type of vehicle stopped [@grogger_testing_2006] which an officer can use to engage in vehicle discrimination and artificial lighting which lights up certain areas of a city at night making drivers more visible [@horrace_how_2016]. To add to these concerns, in recent years there has been concern of endogenous driver behavior that biases the treatment effect of Veil of Darkness toward 0. If Black drivers fear that they will be racially profiled during day but not at night, they might adjust their driving behaviors during daytime to avoid being pulled over. This optimizing behavior was observed by @kalinowski_endogenous_2019 in Massachusetts, East Tennessee, and West Tennessee reflected by a decrease in the severity of speeding violations of Black drivers during daytime which was not found for white drivers. 
+
+## Results
+
+Below, I estimate Model 2 using ordinary least squares regression and report the effect of Darkness on the likelihood that a stopped driver is Black.^[The results of this estimation are robust to estimation using logistic regression. I report the equally valid results of the linear probability model.]
+
+\newpage
+
+###  Table 2: Complete Veil of Darkness Model
+
+```{r}
+model<-feols(fml= black~ cdark | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+      se="hetero", subset=veil_subset==1)
+knitr::kable(etable(model,  se="hetero", title="Complete Veil of Darkness Model"))
+
+#speaking about the economic significance: number of daytime stops of black drivers/(1+B_1)= the amount of stops that should have occurred with no racial bias
+#round(sum(stops$race[stops$cdark==0]=="B")/1.03)
+#8291-8050
+#bias led to 241 additional stops of black drivers.
+#additional stops of black drivers*search hit rate= additional searches
+#1-((133+6520+75120)/91469)=10%
+#roughly 24 additional searches
+
+
+```
+
+Overall results indicate that policing is racially discriminatory with 95% confidence. In the period from 2014-2020, drivers stopped during the inter-twilight period at night are 3% less likely to be Black relative to drivers stopped during the inter-twilight period during day controlling for where and when traffic stops take place.^[I would like to acknowledge one key methodological difference between this analysis and @milyo_dwb_2018: instead of pooling the results of Veil of Darkness into two-year periods, my preferred specification analyses the whole sample. I depart from Milyo's modeling strategy due to concerns that the Veil of Darkness Test is under-powered in a mid-sized jurisdiction like Columbia.] To the extent that exogenous factors such as artificial night-time lighting or vehicle discrimination decrease the difference in officers' ability to determine race prior to a traffic stop between day and night, these results are attenuated. If we believe that police officers are perfectly unable to view race at night prior to making a stop, but they can view race during daytime to an extent, the results indicate that racial profiling led to 241 additional stops of Black drivers during the entire period from 2014-2020 (about 40 extra stops per year.) Again, if Black motorists drive more carefully during day to avoid racial profiling, these results could also be biased toward 0. Policy changes and other factors may have influenced the extent of officer level discrimination over time, so it would be helpful to know if racial profiling increased or decreased over time. To decompose the effects of $\beta_1$ by year, I estimate Model 2 with 6 versions of $D_i$, one for each of the year fixed effects interacted with $D_i$ (plus one additional interaction with a fixed effect for the omitted year.) I omit $D_i$ from this model to avoid a high level of multicollinearity which could attenuate the coefficients. Figure 2 below displays the results from this decomposition with 95% confidence intervals.
+
+### Figure 2: Decomposition of Veil of Darkness by Year
+
+```{r}
+model<-feols(fml= black~ i(cdark, year) | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+             se="hetero", subset=veil_subset==1)
+coefplot(model)
+```
+
+As we can see, the 2014-2015 years see the biggest effects of darkness on the proportion of drivers stopped who are Black. After 2015, the magnitude of $\beta_1$ slowly begins to trend toward the null. In 2017, these results become indistinguishable from 0 with 95% significance, where they remain each year through 2020. One must be cautious in interpreting  these decomposed results. By splitting the effect of $\beta_1$ out by year, the model has fewer observations to use to estimate the effect of treatment which can lead to larger standard errors, specifically in a mid-sized jurisdiction like Columbia [@stacey_veil_2021]. The yearly decomposed results seem to suggest a trend toward nullity in $\beta_1$ over time. While the main specification suggests evidence of officer level discrimination, this assertion does not seem to hold for more recent years. Returning to the previous discussion of the concern of low statistical power of VoD, these concerns do not seem to be the driving force of the null results in recent years. The main concerns threatening the strength of VoD (factors that reduce the relationship between visibility of drivers and daylight) each would bias the results toward 0, but it is unlikely that they would change the direction of the relationship entirely. Since the coefficient is positive in 2018 and 2020, it seems as though the trend toward null results over time is not driven by low statistical power.
+
+
+Next, I re-estimate Model 2 using subgroup analysis. Since the main specification indicates officer bias in the decision to stop Black motorists, it would be helpful to know in which contexts officer level discrimination is the most prevalent. Since subgroup analysis requires additional caution due to the practical concern that estimating multiple equations increases the rate of false discovery incrementally for each additional equation estimated, I adjust the significance level needed to reject the null hypothesis using the Bonferroni Correction. The Bonferroni Correction requires p-values of .01 to reject the null hypothesis for analysis on five subgroups at the 95% confidence level. Below, I estimate the Veil of Darkness results for the subset of each of the following groups separately: male drivers, drivers under the age of 30, drivers stopped for moving violations, drivers stopped for equipment violations, and drivers stopped for expired license plates. I only estimate for these groups to decrease the false discovery rate which increases proportionally with the number of equations estimated.
+
+### Table 3: Subgroup Analysis
+
+```{R}
+Young<-feols(fml= black~ cdark | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+      se="hetero", subset=(veil_subset==1)&(stops$age%in%c("Under 18", "18--29")))
+Male<-feols(fml= black~ cdark | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+      se="hetero", subset=(veil_subset==1)&(stops$gender=="M"))
+Moving<-feols(fml= black~ cdark | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+      se="hetero", subset=(veil_subset==1)&(stops$moving=="1"))
+Equipment<-feols(fml= black~ cdark | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+      se="hetero", subset=(veil_subset==1)&(stops$equipment=="1"))
+License<-feols(fml= black~ cdark | year + month + newLocation + newbeat + DoW[amHour, pmHour] , data=stops,
+      se="hetero", subset=(veil_subset==1)&(stops$license=="1"))
+
+knitr::kable(etable(Young, Male, Moving, Equipment, License, se="hetero", signifCode=NULL))
+
+```
+
+None of the subgroups pass the alternative level of significance mandated by the Bonferroni Correction. One disclaimer about the use of the Bonferroni Correction is that it is a notoriously conservative procedure (which increases the likelihood of incorrectly failing to reject the null hypothesis). This is a particularly concerning feature in this setting due to concerns that the Veil of Darkness Test may be under-powered in a mid-sized jurisdiction like Columbia. Since subgroup analysis even further increases standard errors due to the decreased sample size, it is important to discuss the power of this subgroup analysis. Examining the largest subgroup, male drivers, the magnitude of $\beta_1$ would have to be bigger than -0.044 to reject the null, meaning that this hypothesis test cannot detect effect sizes smaller than a 4.4% decrease in the proportion of drivers stopped who are Black between day and night. For the subgroup with the smallest number of observations, drivers stopped for equipment violations, we are unable to detect an effect smaller than -.071, a difference of 7.1% in the proportion of stopped drivers who are black. Due to the large effect size needed to reject the null hypothesis of $\beta_1=0$, it is hard to draw meaningful conclusions from subgroup analysis on the Veil of Darkness sample in Columbia. While such analysis may be useful in larger jurisdictions, the survey sample in Columbia seems to be too small to draw meaningful conclusions from the Veil of Darkness Test on subgroups.
+
+## Conclusion
+
+Despite concerns about the statistical power of the Veil of Darkness test, this test conducted on the full Veil of Darkness sample of stops suggests that police in Columbia used information about race in their decision to stop motorists. Specifically, the VoD test rejects the null hypothesis of no officer level discrimination in the decision to stop Black motorists with 95% confidence. Although this modeling strategy suggests that officers pulled over 3% more Black drivers while they had information about the race of the driver, this figure is attenuated to the extent that any factors decrease the relationship between daylight and the ability to deduce the race of a driver prior to making a traffic stop. When examined across time however, officer level discrimination seems to be trending toward 0. In fact, Veil of Darkness does not yield statistically significant evidence of officer level discrimination in any year after 2017. It does not appear that these results are due to low statistical power, because the signs on the estimates for two of the years are positive (yet statistically insignificant), the opposite of what we would expect if officers were discriminating against Black drivers. Examining subgroups of drivers using the Veil of Darkness test yields inconclusive results due to the low statistical power of these comparisons. While this test suggests the presence of racial discrimination in the decision to stop Black motorists, it cannot be used to assert whether other forms of racial discrimination took place during this period such as racial discrimination in officer use of force, decision to search stopped drivers, or the outcome of the stop (arrest, warning, citation, etc.)
+
+
+The decision to stop motorists is one very important feature of the criminal justice system to investigate for racial bias. This is a convenient area to test due to the availability of data and a clever, well-established methodology to isolate as-good-as-random variation in officers' ability to discriminate. However, this is only one of many areas where actors in the criminal justice system have enough discretion to allow for implicit biases to affect criminal justice outcomes for individuals. While this analysis suggests that officer level racial discrimination in the decision to stop motorists is less of a concern in recent years, this is only one piece of the larger criminal justice system. As such, this paper should not be seen as evidence that Columbia's criminal justice system as a whole treats civilians equally on the basis of race. Since the effects of criminal justice involvement are long lasting (even multigenerational) and evidence exists that the decision to stop motorists was likely racially motivated within the past seven years, Columbia would do well to search for additional ways to support its citizens who have been disproportionately stopped by its police officers.
+
+## Appendix
+
+### A1: Map of Police Beat Assignments by Census Block 
+
+```{R, fig.align="center"}
+#importing the census blocks shape file
+shape<-st_read(dsn="E:/Police_Work_2021/police beat/tigerline data/tl_2021_29_tabblock20/tl_2021_29_tabblock20.shp",
+               stringsAsFactors=FALSE, geometry_column="geometry", quiet=TRUE)
+uniqueBlock<-unique(stops$GEOID20)
+blockshp<-shape[shape$GEOID20 %in% uniqueBlock,]
+blockshp<-blockshp[blockshp$COUNTYFP20=="019",]
+rm(shape)
+
+#beat by block assignments
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+beat_block_pairs<-stops %>% group_by(GEOID20) %>% summarise(beat=Mode(newbeat))
+beat_block_pairs<-beat_block_pairs[!is.na(beat_block_pairs$beat),]
+blockshp<-merge(blockshp, beat_block_pairs)
+ggplot(blockshp) + 
+  geom_sf(aes(fill=beat)) +
+  coord_sf(xlim = c(-92.4, -92.25), ylim = c(38.875, 39.015))+
+  theme_bw()+
+  theme(axis.text.x=element_blank(),
+           axis.text.y=element_blank())+
+  guides(fill=guide_legend(title="Police Beat"))
+
+
+```
+
+### A2: Search Hit Rate by Police Beat
+
+```{R, fig.align="center"}
+
+#aggregating the shape file by police beat
+beatshp<-blockshp %>% 
+  group_by(beat) %>%
+  summarise() %>%
+  ungroup() %>% st_as_sf()
+
+#calculating search hit rates
+stops<-stops %>% mutate(search_bin=case_when(is.na(what_searched)~ as.character(search),
+                                      is.na(search)~ as.character(what_searched)))
+stops<-stops %>% mutate(search_bin=case_when(search_bin %in% c("", "NO")~ 0, T~1))
+hit_rate_by_beat<-stops %>% filter(search_bin==1) %>%
+  group_by(newbeat) %>%
+  summarise(hit_rate= mean(contraband_found=="Yes"))
+hit_rate_by_beat<-hit_rate_by_beat[!is.na(hit_rate_by_beat$newbeat),]
+names(hit_rate_by_beat)[1]<-"beat"
+
+#merging data
+beatshp<-merge(beatshp, hit_rate_by_beat)
+
+#rendering the map
+ggplot(beatshp) + 
+  geom_sf(aes(fill=hit_rate)) +
+  scale_fill_viridis(breaks=.1*1:10, name="Search Hit Rate", direction=-1, option="E") +
+  coord_sf(xlim = c(-92.4, -92.25), ylim = c(38.875, 39.015))+
+  theme_bw()+
+  theme(axis.text.x=element_blank(),
+           axis.text.y=element_blank())
+  
+
+```
+
+### A.3: Proportion of Drivers Stopped who are Black
+
+```{R, fig.align="center"}
+#merging in race data
+pct_blc<-stops %>% group_by(newbeat) %>% summarize(pct_blc=mean(black))
+names(pct_blc)[1]<-"beat"
+beatshp<-merge(beatshp, pct_blc)
+
+#rendering the map
+ggplot(beatshp) + 
+  geom_sf(aes(fill=pct_blc)) +
+  scale_fill_viridis(breaks=.1*1:10, name="Proportion Black", direction=-1, option="C") +
+  coord_sf(xlim = c(-92.4, -92.25), ylim = c(38.875, 39.015))+
+  theme_bw()+
+  theme(axis.text.x=element_blank(),
+           axis.text.y=element_blank())
+
+```
+
+### A.4: Vehicle Stop Form
+
+```{r, include=TRUE, fig.align="center", echo=FALSE}
+knitr::include_graphics("./2020vsrtemplateform.pdf")
+```
+## References

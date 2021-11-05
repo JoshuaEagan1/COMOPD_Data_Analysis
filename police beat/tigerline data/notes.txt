@@ -1,0 +1,7 @@
+The demographic information came from the following URL:
+https://data.census.gov/cedsci/table?q=United%20States&g=0400000US29%24100000,29%241400000&tid=DECENNIALPL2020.P1&hidePreview=true
+
+The shape files came from the following URLs:
+https://www.census.gov/cgi-bin/geo/shapefiles/index.php?year=2021&layergroup=Census+Tracts
+
+To reproduce this project, download the tl_2021_29_tabblock and tl_2021_29_tract shape files and unzip them into folders with the same names. Download the corresponding demographic information, and locate the files for tracts and blocks in folders called `census tract info` and `census bock info` respectively.

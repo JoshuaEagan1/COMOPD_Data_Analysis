@@ -4,7 +4,6 @@
 #Work on this project began on January 19, 2021
 
 #loading libraries
-library(rvest)
 library(tidyverse)
 
 #reading in the traffic stops data
@@ -12,22 +11,25 @@ library(tidyverse)
 #URL's and data was loaded from CPD's website https://www.como.gov/police/data-reporting-forms/ on January 19, 2021
 
 #2014
-data14<-read.csv("https://www.como.gov/police/wp-content/uploads/sites/16/2017/01/CPD-vehicle-stop-data-2014.csv")
+data14<-read.csv("https://www.como.gov/wp-content/uploads/2020/10/CPD-vehicle-stop-data-2014.csv")
 
 #2015
-data15<-read.csv("https://www.como.gov/police/wp-content/uploads/sites/16/2017/01/CPD-vehicle-stop-data-2015.csv")
+data15<-read.csv("https://www.como.gov/wp-content/uploads/2020/10/CPD-vehicle-stop-data-2015.csv")
 
 #2016
-data16<-read.csv("https://www.como.gov/police/wp-content/uploads/sites/16/2017/02/CPD_vehicle_stop_data_2016.csv")
+data16<-read.csv("https://www.como.gov/wp-content/uploads/2020/10/CPD_vehicle_stop_data_2016.csv")
 
 #2017
-data17<-read.csv("https://www.como.gov/police/wp-content/uploads/sites/16/2018/01/CPD_vehicle_stop_data_2017.csv")
+data17<-read.csv("https://www.como.gov/wp-content/uploads/2020/10/CPD_vehicle_stop_data_2017.csv")
 
 #2018
-data18<-read.csv("https://www.como.gov/police/wp-content/uploads/sites/16/2019/05/CPD_vehicle_stop_data_2018.csv")
+data18<-read.csv("https://www.como.gov/wp-content/uploads/2020/10/CPD_vehicle_stop_data_2018-2.csv")
 
 #2019
-data19<-read.csv("https://www.como.gov/police/wp-content/uploads/sites/16/2020/03/CPD_vehicle_stop_data_2019.csv")
+data19<-read.csv("https://www.como.gov/wp-content/uploads/2020/10/CPD_vehicle_stop_data_2019.csv")
+
+#2020
+data20<-read.csv("https://www.como.gov/wp-content/uploads/2021/06/CPD_vehicle_stop_data_2020-6.csv")
 
 setwd("E:/Police_Work_2021")
 
@@ -41,7 +43,7 @@ setwd("E:/Police_Work_2021")
 #load("data_backup_20210119.R")
 
 #standardizing column names (. to _ and making names all lower case)
-for(i in 14:19){
+for(i in 14:20){
         obj<-get(paste0("data", i))
         n_vect<-tolower(names(get(paste0("data", i))))
         names(obj)<-gsub("[.]", "_", n_vect)
@@ -71,6 +73,10 @@ setdiff(names(data18), names(data17))
 #another change in naming conventions between 18-19
 setdiff(names(data18), names(data19))
 setdiff(names(data19), names(data18))
+
+#another change in naming conventions between 19-20
+setdiff(names(data19), names(data20))
+setdiff(names(data20), names(data19))
 
 #changing some names...
 names(data14)[5]<-"time_"
@@ -127,6 +133,7 @@ rm(data_14_17, data_18_19)
 #standardizing each of the variables, beginning with the time variable
 
 stops$calltime<-strptime(stops$calltime, format="%m/%e/%Y %H:%M:%S")
+
 stops<- stops %>% mutate(year=lubridate::year(calltime), 
                          day=lubridate::day(calltime),
                          time=strftime(calltime, format="%H:%M:%S"),
@@ -306,4 +313,130 @@ stops$admit_prior_use<-stops$admit_prior_use %>% as.character()
 stops$admit_prior_use[stops$admit_prior_use=="No"]<-"NO"
 stops$admit_prior_use[stops$admit_prior_use=="Yes"]<-"YES"
 
-save("stops", file="standardized_traffic_stops_data_20210218.R")
+#adding the data from 2020
+setdiff(names(stops), names(data20))
+setdiff(names(data20), names(stops))
+
+names(data20)[c(13, 47)]<-c("arrest_???", "hour")
+
+data20$calltime<-strptime(data20$calltime, format="%m/%d/%Y %H:%M")
+data20<- data20 %>% mutate(year=lubridate::year(calltime), 
+                         day=lubridate::day(calltime),
+                         time=strftime(calltime, format="%H:%M:%S"),
+                         month=lubridate::month(calltime))
+
+na_20<-data.frame(rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)),
+                  rep(NA, nrow(data20)))
+names(na_20)<- c("speed", "lane_violation", "follow_to_close", "fail_to_signal", "cve", "other", "unk", "what_searched", "special_op", "admit_prior_use")
+data20<-cbind(data20, na_20)
+
+na_stops<-data.frame(rep(NA, nrow(stops)),
+                     rep(NA, nrow(stops)),
+                     rep(NA, nrow(stops)),
+                     rep(NA, nrow(stops)),
+                     rep(NA, nrow(stops)))
+names(na_stops)<-c("beat", "arrest_???", "search", "drug", "alcohol")
+stops<-cbind(stops, na_stops)
+
+setdiff(names(stops), names(data20))
+setdiff(names(data20), names(stops))
+
+stops<-rbind(stops, data20)
+
+#checking the merge
+checker(names(stops)[63])
+
+#changing nature
+stops$nature[stops$nature=="TRAFFIC STOP"]<-"T TRFC STOP"
+
+#changing age
+stops$age[stops$age=="40--64"|stops$age=="65+"]<-"40+"
+
+#changing moving
+stops$moving[stops$moving>1]<-1
+
+#changing citation
+stops$citation[stops$citation>1]<-1
+
+#changing warning
+stops$warning[stops$warning>1]<-1
+
+#changing search_duration
+stops$search_duration[stops$search_duration=="10"|stops$search_duration=="0-15 minutes"]<-"0--15"
+
+#changing controband found
+stops$contraband_found[is.na(stops$contraband_found)]<-""
+stops$contraband_found[stops$contraband_found=="YSTL"]<-"Yes"
+
+#implement fix on location variable
+
+#*generating the new Location variable: loc
+loc<-rep("city", nrow(stops))
+
+#replace loc ="state"
+loc[grepl("GRINDSTONE PKWY|COLLEGE AV|STRAWN|BALLENGER|WW|HIGHWAY KK|LOOP|HIGHWAY 763|CLARK|ROUTE K|ROUTE B|SOUTHEAST|SOUTHWEST|I70 DR SOUTHEAST", stops$address)]<-"state"
+loc[grepl("BROADWAY", stops$address) & !grepl("WEST BLVD|TENTH|NINTH|EIGHTH|SEVENTH|SIXTH|FIFTH|FOURTH|THIRD|SECOND|FIRST|OLD 63|WILLIAM|WILLIS|WAUGH|TRIMBLE|HITT|GARTH|BLUFFS|ROCKINGHAM|PERSHING|DORSEY|SHORT|RIPLEY|ANN|HINKSON AV|MCBAINE|CLINKSCALES|GLENWOOD|EDGEWOOD|BRIARWOOD|ALDEAH|GREENWOOD", stops$address)]<-"state"
+loc[grepl("SCOTT", stops$address) & !grepl("BROOKVIEW|COPPERSTONE|VAWTER SCHOOL RD|PRESCOTT", stops$address)]<-"state"
+loc[grepl("PARIS", stops$address) & !grepl("MONROE ST|WILKES BLVD|HINKSON AV|WILLIAM ST|AMMONETTE ST|GORDON ST|ANN ST N|COURT ST|PARIS CT", stops$address)]<-"state"
+loc[grepl("PROVIDENCE", stops$address) & !grepl("VANDIVER|BLUE RIDGE|TEXAS AV|SMILEY LN|ARMADILLO DR|BIG BEAR BLVD|BROWN SCHOOL RD|RAIN FOREST PKWY|LESLIE LN|1612 PROVIDENCE RD N-CO.|1704 PROVIDENCE RD N-CO.|1704 PROVIDENCE RD N-CO|LESLIE LN", stops$address)]<-"state"
+loc[grepl("STADIUM", stops$address) & !grepl("OLD 63")]<-"state"
+loc[grepl("RANGE LINE", stops$address) & !grepl("ROGERS ST|WILKES BLVD|SMITH ST")]<-"state"
+
+#replace loc ="i70"
+loc[grepl("I70", stops$address) & !grepl("I70 DR", stops$address)]<-"i70"
+
+#replace loc ="US"
+loc[grepl("HIGHWAY 63", stops$address) & !grepl("OLD HIGHWAY 63|I70|HWY 63", stops$address)]<-"US"
+
+#replace loc = "boone"
+loc[grepl("SCOTT BLVD S-BC/THORNBROOK RDG-BC.|MERIDETH|BELLVIEW DR|AIRPORT DR|5695 CLARK LN|CLARK LN E-BC/LAKEWOOD DR|BELLVIEW DR", stops$address)]<-"boone"
+loc[grepl("LAKE OF THE WOODS", stops$address) & !grepl("EXIT", stops$address)]<-"boone"
+
+stops<- stops %>% mutate(newLocation=loc)
+
+###
+cache<-stops
+stops<-cache
+###
+
+#adding variables for `intertwilight` and `cdark`
+load("como_twilight_data_20210919.rda")
+stops<-stops %>% mutate(month=as.character(as.numeric(month)))
+stops$month<-month.abb[as.numeric(stops$month)]
+stops<-merge(stops, twilight)
+
+#makes all times relative to the same day: 2021-10-10
+#this is for comparison to the sunlight data
+stops<-stops %>% mutate(comp_time=strptime(time, format="%H:%M:%S"))
+stops$comp_time<-stops$comp_time-as.difftime(Sys.Date()-as.Date("2021-10-10"))
+
+max_ctwi_e<-max(stops$civilTwilightEnd)
+min_ctwi_e<-min(stops$civilTwilightEnd)
+max_ctwi_s<-max(stops$civilTwilightStart)
+min_ctwi_s<-min(stops$civilTwilightStart)
+max_sunr<-max(stops$sunrise)
+min_sunr<-min(stops$sunrise)
+max_suns<-max(stops$sunset)
+min_suns<-min(stops$sunset)
+
+stops<-stops %>% mutate(cdark=case_when((comp_time>sunrise)&(comp_time<sunset)~0, T~1),
+                        intertwilight=case_when(((comp_time>min_ctwi_s)&(comp_time<max_ctwi_s))|((comp_time>min_ctwi_e)&(comp_time<max_ctwi_e))~1,T~0),
+                        twilight=case_when(((comp_time>civilTwilightStart)&(comp_time<sunrise))|((comp_time<civilTwilightEnd)&(comp_time>sunset))~1,T~0))
+table(stops$twilight, stops$intertwilight)
+
+#merging in geography information
+load("E:/Police_Work_2021/police beat/geo_data.R")
+geo<-geo %>% select(-8)
+stops<-merge(stops, geo)
+stops<-stops %>% select(-c(65:69))
+
+#saving clean data
+save("stops", file="standardized_traffic_stops_data_20211014.R")
