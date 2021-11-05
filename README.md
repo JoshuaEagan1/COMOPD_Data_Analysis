@@ -4,7 +4,7 @@ These projects will shed light on different aspects of traffic policing in Colum
 
 ## Projects
 
-There are two main products I will make available to COMOPD, Columbia's Civilian Police Review Board, and the public. 
+There are two main products I am making available to COMOPD, Columbia's Civilian Police Review Board, and the public. 
 
 ### COMOPD Data Dashboard
 I designed a data dashboard that will empower people who want to know more about what traffic stops look like to explore the data in user friendly, customizable environment. <https://jeagan.shinyapps.io/cpd_data_dashboard/>
@@ -23,7 +23,7 @@ To reproduce the entire data cleaning procedure:
 3. Visit [this website](https://developers.google.com/maps/documentation/geocoding/overview) to create a Google Cloud account and find your geocoding API key
 4. Next, open the file `\police beat\geocoding 2020 stops.R` and replace both instances of 'SECRET' with your API key
 5. Open the `\police beat\tigerline data\notes.txt` file and follow the instructions to download the shape files and demographic information
-6. Use the `\police beat\geocoding 2020 stops.R` script to add latitude and longitude to the traffic stops data. If you want to re-geode all the stops, you will need to edit this file to include all the stops, not just the ones from 2020. Otherwise, the pre-2020 stops are included in a .csv file in the `\police beat` directory.
+6. Use the `\police beat\geocoding 2020 stops.R` script to add latitude and longitude to the traffic stops data. If you want to re-geocode all the stops, you will need to edit this file to include all the stops, not just the ones from 2020. Otherwise, the pre-2020 stops are included in a .csv file in the `\police beat` directory.
 7. Use the `\police beat\creating geographic variables.R` script to assign a police beat to the traffic stops data
 8. Run the file `cleaning_traffic_stops_data.R` all the way through.
 
